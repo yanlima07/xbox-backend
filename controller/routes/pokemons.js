@@ -10,67 +10,59 @@ const fetch = require("node-fetch");
 
 var jwt = require("jsonwebtoken");
 
-router.get("/", async (req, res) => {
-  const token = req.headers.token;
-  if (!token) {
-    return res.status(400).json("Não autenticado");
-  }
-
-  try {
-    jwt.verify(token, process.env.JWT_SECRET_KEY);
-  } catch (err) {
-    return res.status(400).json("Não autenticado");
-  }
-
+router.get("/", checkUserToken, async (req, res) => {
   const name = req.query.name;
   if (!name) {
     return res.status(400).json("Nome inválido");
   }
 
-  const Images = await Image.find({
+  const Pokemon = await Pokemon.find({
     name: { $regex: name, $options: "i" },
   }).exec();
 
-  if (!Images) {
-    return res.status(400).json("Não existem imagens com esse nome");
+  if (!Pokemon) {
+    return res.status(400).json("Pokémon not found!");
   }
 
-  res.status(200).json(Images);
+  res.status(200).json(Pokemon);
 });
 
-router.post("/", upload.single("url"), (req, res) => {
-  const token = req.headers.token;
-  if (!token) {
-    return res.status(400).json("Não autenticado");
-  }
-
-  try {
-    jwt.verify(token, process.env.JWT_SECRET_KEY);
-  } catch (err) {
-    return res.status(400).json("Não autenticado");
-  }
-
+router.post("/", checkUserToken, upload.single("url"), (req, res) => {
   fetch(`${process.env.FILESTACK_KEY}`, {
     method: "POST",
     headers: { "Content-Type": "image/png" },
     body: req.file.buffer,
   })
-    .then((r) => r.json())
+    .then((dataResponse) => dataResponse.json())
     .then(
-      async (resFile) => {
-        const newImage = new Image({
+      async (responseFileStack) => {
+        const newPokemon = new Pokemon({
           name: req.body.name,
-          url: resFile.url,
+          url: responseFileStack.url,
         });
+        newPokemon.save();
 
-        newImage.save();
-
-        return res.status(200).json("Criado com sucesso");
+        return res.status(200).json("Pokémon created with sucess!");
       },
-      (err) => {
-        return res.status(500).json("Erro ao salvar a imagem");
+      (error) => {
+        return res.status(500).json("Pokémon not created!");
       }
     );
 });
+
+function checkUserToken(req, res, next) {
+  const token = req.headers.token;
+  if (!token) {
+    return res.status(400).json({ error: "User not athenticated!" });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET_KEY, function (error, decoded) {
+    if (error) return res.status(400).json({ error: "User not athenticated!" });
+
+    req.token = token;
+    req.idUser = decoded.id;
+    next();
+  });
+}
 
 module.exports = router;
