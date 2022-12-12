@@ -11,20 +11,8 @@ const fetch = require("node-fetch");
 var jwt = require("jsonwebtoken");
 
 router.get("/", checkUserToken, async (req, res) => {
-  const name = req.query.name;
-  if (!name) {
-    return res.status(400).json("Nome inválido");
-  }
-
-  const Pokemon = await Pokemon.find({
-    name: { $regex: name, $options: "i" },
-  }).exec();
-
-  if (!Pokemon) {
-    return res.status(400).json("Pokémon not found!");
-  }
-
-  res.status(200).json(Pokemon);
+  const pokemon = await Pokemon.find({}).exec();
+  res.status(200).json(pokemon);
 });
 
 router.post("/", checkUserToken, upload.single("url"), (req, res) => {
